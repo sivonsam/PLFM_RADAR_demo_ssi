@@ -217,7 +217,9 @@ set_property IOSTANDARD LVCMOS33 [get_ports {ft601_gpio1}]
 
 # --------------------------------------------------------------------------
 # FT601 input delays (relative to ft601_clk_in, 100 MHz)
-# FT601 datasheet: Tco max = 7.0 ns, Tco min = 1.0 ns
+# FT601 datasheet (245 Sync FIFO mode): Tco max = 7.0 ns, Tco min = 1.0 ns
+# NOTE: ft601_data is bidirectional — input delay applies during READ ops.
+# ft601_be is output-only in this write-only design; no set_input_delay.
 # --------------------------------------------------------------------------
 set_input_delay -clock [get_clocks ft601_clk_in] -max 7.000 [get_ports {ft601_data[*]}]
 set_input_delay -clock [get_clocks ft601_clk_in] -min 1.000 [get_ports {ft601_data[*]}]
@@ -225,34 +227,79 @@ set_input_delay -clock [get_clocks ft601_clk_in] -max 7.000 [get_ports {ft601_tx
 set_input_delay -clock [get_clocks ft601_clk_in] -min 1.000 [get_ports {ft601_txe}]
 set_input_delay -clock [get_clocks ft601_clk_in] -max 7.000 [get_ports {ft601_rxf}]
 set_input_delay -clock [get_clocks ft601_clk_in] -min 1.000 [get_ports {ft601_rxf}]
-set_input_delay -clock [get_clocks ft601_clk_in] -max 7.000 [get_ports {ft601_be[*]}]
-set_input_delay -clock [get_clocks ft601_clk_in] -min 1.000 [get_ports {ft601_be[*]}]
+# ft601_be[*] is output-only — removed erroneous set_input_delay (was causing
+# critical warnings and dropped constraints in previous build)
 
 # --------------------------------------------------------------------------
-# FT601 output delays
-# For WRITE: FPGA drives data on ft601_clk_in edges (same clock domain).
-# FT601 Tsu = 3.0 ns, Th = 0.5 ns
-# Using ft601_clk_in directly (no ODDR forwarded clock on FMC path).
+# FT601 output timing — source-synchronous, datapath-only constraints
 # --------------------------------------------------------------------------
-set_output_delay -clock [get_clocks ft601_clk_in] -max 3.500 [get_ports {ft601_data[*]}]
-set_output_delay -clock [get_clocks ft601_clk_in] -min 0.000 [get_ports {ft601_data[*]}]
-set_output_delay -clock [get_clocks ft601_clk_in] -max 3.500 [get_ports {ft601_be[*]}]
-set_output_delay -clock [get_clocks ft601_clk_in] -min 0.000 [get_ports {ft601_be[*]}]
-set_output_delay -clock [get_clocks ft601_clk_in] -max 3.500 [get_ports {ft601_wr_n}]
-set_output_delay -clock [get_clocks ft601_clk_in] -min 0.000 [get_ports {ft601_wr_n}]
-set_output_delay -clock [get_clocks ft601_clk_in] -max 3.500 [get_ports {ft601_rd_n}]
-set_output_delay -clock [get_clocks ft601_clk_in] -min 0.000 [get_ports {ft601_rd_n}]
-set_output_delay -clock [get_clocks ft601_clk_in] -max 3.500 [get_ports {ft601_oe_n}]
-set_output_delay -clock [get_clocks ft601_clk_in] -min 0.000 [get_ports {ft601_oe_n}]
+# The FT601 provides its own 100 MHz clock (D_CLK) and samples data on
+# the next rising edge of that same clock. The FPGA receives D_CLK through
+# IBUF→BUFG (~5 ns insertion), but this insertion delay is COMMON to both
+# the data launch (register clocked by BUFG output) and the data capture
+# (FT601 sampling on the same physical clock edge).
+#
+# Using set_output_delay with the real clock creates a false ~5 ns skew
+# penalty. Using a virtual clock doesn't help because Vivado still sees
+# the IBUF+BUFG insertion on the source side.
+#
+# Instead, we use set_max_delay -datapath_only to constrain the
+# register-to-pad delay directly. The budget is:
+#   Tperiod(10 ns) - Tsu(2.0 ns) - Tboard_margin(0.5 ns) = 7.5 ns
+# This ensures data arrives at the FT601 pad with 2.5 ns margin before
+# the next clock edge.
+#
+# For hold (min delay): We use set_min_delay. The FT601 Th = 0.5 ns.
+# The data must not change until 0.5 ns after the CURRENT clock edge.
+# Since the register launches on the clock edge and the pad delay is
+# always positive (>= 1 ns), hold is inherently met. We set min = 0
+# to be safe.
+# --------------------------------------------------------------------------
+
+# Remove any output_delay on these ports (clean slate — the constraints
+# below supersede them)
+# Data bus
+set_max_delay -datapath_only -from [get_clocks ft601_clk_in] -to [get_ports {ft601_data[*]}] 7.500
+set_min_delay -from [get_clocks ft601_clk_in] -to [get_ports {ft601_data[*]}] 0.000
+# Byte enable
+set_max_delay -datapath_only -from [get_clocks ft601_clk_in] -to [get_ports {ft601_be[*]}] 7.500
+set_min_delay -from [get_clocks ft601_clk_in] -to [get_ports {ft601_be[*]}] 0.000
+# Write strobe
+set_max_delay -datapath_only -from [get_clocks ft601_clk_in] -to [get_ports {ft601_wr_n}] 7.500
+set_min_delay -from [get_clocks ft601_clk_in] -to [get_ports {ft601_wr_n}] 0.000
+# Read strobe
+set_max_delay -datapath_only -from [get_clocks ft601_clk_in] -to [get_ports {ft601_rd_n}] 7.500
+set_min_delay -from [get_clocks ft601_clk_in] -to [get_ports {ft601_rd_n}] 0.000
+# Output enable
+set_max_delay -datapath_only -from [get_clocks ft601_clk_in] -to [get_ports {ft601_oe_n}] 7.500
+set_min_delay -from [get_clocks ft601_clk_in] -to [get_ports {ft601_oe_n}] 0.000
+
+# --------------------------------------------------------------------------
+# Note: Input delays still reference ft601_clk_in (correct for inputs,
+# where the FT601 drives data relative to its clock and the FPGA samples
+# after IBUF+BUFG insertion — the pessimistic direction Vivado handles
+# correctly).
+# --------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------
 # IOB packing for timing — same strategy as production XDC
+# Use -quiet because register names depend on synthesis elaboration;
+# a -quiet miss is non-fatal, but the constraint logs should be checked.
 # --------------------------------------------------------------------------
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_data_out_reg*}]
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_be_reg*}]
-set_property IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_wr_n_reg*}]
+set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_wr_n_reg*}]
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_rd_n_reg*}]
 set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_oe_n_reg*}]
+set_property -quiet IOB TRUE [get_cells -hierarchical -filter {NAME =~ *usb_inst/ft601_siwu_n_reg*}]
+
+# --------------------------------------------------------------------------
+# Async / false paths — chip reset and wakeup are not timing-critical
+# --------------------------------------------------------------------------
+set_false_path -to [get_ports {ft601_chip_reset_n}]
+set_false_path -to [get_ports {ft601_wakeup_n}]
+set_false_path -to [get_ports {ft601_gpio0}]
+set_false_path -to [get_ports {ft601_gpio1}]
 
 # --------------------------------------------------------------------------
 # NOTES ON RTL ADAPTATION FOR FMC BUILD

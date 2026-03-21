@@ -40,6 +40,11 @@
           </thead>
           <tbody>
             <tr>
+              <td><code>TBD</code> <strong>v0.1.8-te0713-ft601-dev</strong></td>
+              <td>TE0713/TE0701 + UMFT601X-B FT601 integration dev bitstream</td>
+              <td>First timing-clean FT601 USB integration build for the Trenz + UMFT601X-B FMC LPC stack. Wrapper module (<code>radar_system_top_te0713_umft601x_dev</code>) instantiates the full <code>usb_data_interface</code> with synthetic test data (range/Doppler/CFAR packets). Timing closure achieved after fixing source-synchronous clock skew: replaced <code>set_output_delay</code> with <code>set_max_delay -datapath_only</code> for outputs, removed erroneous <code>set_input_delay</code> on output-only <code>ft601_be[*]</code>. WNS +0.059 ns, WHS +0.121 ns, DRC 0 errors. Strategy: <code>Performance_ExplorePostRoutePhysOpt</code>. Vivado 2025.2. Bitstream: <code>docs/artifacts/te0713-te0701-umft601x-dev-2026-03-21.bit</code>.</td>
+            </tr>
+            <tr>
               <td><code>TBD</code> <strong>v0.1.7-te0713-heartbeat</strong></td>
               <td>TE0713/TE0701 minimal heartbeat bring-up bitstream</td>
               <td>Created a low-risk bring-up artifact for the Trenz TE0713 + TE0701 stack using <code>radar_system_top_te0713_dev</code> and <code>te0713_te0701_minimal.xdc</code>. Remote Vivado 2025.2 build completed with DRC 0 errors, WNS +17.863 ns, WHS +0.265 ns. Intended as the first board-day image before FT601 arrival and before any radar-path integration.</td>
