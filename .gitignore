@@ -95,3 +95,6 @@ __pycache__/
 secrets/
 **/secrets.*
 **/*credentials*
+
+# Athene generated outputs
+athene/out/
