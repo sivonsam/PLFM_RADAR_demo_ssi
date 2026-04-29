@@ -16,6 +16,7 @@ Digitraffic open data terms: https://www.digitraffic.fi/en/terms-of-service/
 """
 from __future__ import annotations
 
+import gzip
 import json
 import time
 import urllib.request
@@ -62,8 +63,12 @@ def fetch_ais() -> dict[int, AISVessel]:
         return _cache
 
     try:
-        with urllib.request.urlopen(_AIS_URL, timeout=FETCH_TIMEOUT) as resp:
-            data = json.loads(resp.read())
+        req = urllib.request.Request(_AIS_URL, headers={"Accept-Encoding": "gzip"})
+        with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
+            raw = resp.read()
+            if resp.info().get("Content-Encoding") == "gzip":
+                raw = gzip.decompress(raw)
+            data = json.loads(raw)
 
         _cache.clear()
         for feature in data.get("features", []):

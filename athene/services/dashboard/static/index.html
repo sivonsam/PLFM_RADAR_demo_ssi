@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Athene — Maritime Situational Awareness</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet.RotatedMarker (for heading arrows) -->
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Top bar ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 8px 16px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      flex-shrink: 0;
+    }
+    #topbar h1 { font-size: 16px; font-weight: 600; letter-spacing: 1px; color: #58a6ff; }
+    #topbar .badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 12px;
+      background: #21262d; border: 1px solid #30363d;
+    }
+    #topbar .badge.live { border-color: #3fb950; color: #3fb950; }
+    #topbar .badge.dark-warn { border-color: #f85149; color: #f85149; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    #status-bar { margin-left: auto; font-size: 11px; color: #8b949e; }
+
+    /* ── Layout ── */
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-title {
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8b949e;
+      border-bottom: 1px solid #30363d;
+      background: #0d1117;
+    }
+
+    /* Weather strip */
+    #weather-strip {
+      display: flex;
+      gap: 16px;
+      padding: 8px 12px;
+      border-bottom: 1px solid #30363d;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    #weather-strip span { color: #8b949e; }
+    #weather-strip strong { color: #e6edf3; }
+
+    /* Alert panel */
+    #alerts-panel {
+      flex-shrink: 0;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+    .alert-item {
+      padding: 7px 12px;
+      border-bottom: 1px solid #21262d;
+      font-size: 11px;
+      background: #1c1008;
+      border-left: 3px solid #f85149;
+    }
+    .alert-item .alert-title { color: #f85149; font-weight: 600; }
+    .alert-item .alert-sub   { color: #8b949e; margin-top: 2px; }
+
+    /* Track list */
+    #track-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .track-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-bottom: 1px solid #21262d;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .track-item:hover { background: #21262d; }
+    .track-item.selected { background: #1f3a5f; }
+
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .dot.confirmed  { background: #58a6ff; }
+    .dot.dark       { background: #f85149; box-shadow: 0 0 6px #f85149; }
+    .dot.unknown    { background: #e3b341; }
+
+    .track-info { flex: 1; min-width: 0; }
+    .track-name {
+      font-size: 12px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .track-meta { font-size: 10px; color: #8b949e; }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+    }
+
+    /* ── Detail popup (bottom-right) ── */
+    #detail-panel {
+      position: absolute;
+      bottom: 24px; right: 16px;
+      width: 260px;
+      background: rgba(22, 27, 34, 0.96);
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      z-index: 1000;
+      display: none;
+    }
+    #detail-panel .dp-title {
+      font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #58a6ff;
+    }
+    #detail-panel table { width: 100%; border-collapse: collapse; }
+    #detail-panel td { padding: 2px 0; }
+    #detail-panel td:first-child { color: #8b949e; width: 110px; }
+    #detail-close {
+      position: absolute; top: 8px; right: 10px;
+      cursor: pointer; font-size: 14px; color: #8b949e;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0d1117; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="topbar">
+  <h1>⚡ ATHENE</h1>
+  <span class="badge">Gulf of Finland</span>
+  <span class="badge live" id="badge-ais">AIS ●</span>
+  <span class="badge live" id="badge-radar">RADAR ●</span>
+  <span class="badge dark-warn" id="badge-dark" style="display:none">⚠ DARK TARGET</span>
+  <div id="status-bar">
+    Events: <strong id="ev-count">0</strong> &nbsp;|&nbsp;
+    Tracks: <strong id="tr-count">0</strong> &nbsp;|&nbsp;
+    AIS vessels: <strong id="ais-count">0</strong>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div id="main">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="panel-title">Weather — Helsinki</div>
+    <div id="weather-strip">
+      <div><span>Wind </span><strong id="wx-wind">—</strong></div>
+      <div><span>Dir </span><strong id="wx-dir">—</strong></div>
+      <div><span>Wave </span><strong id="wx-wave">—</strong></div>
+    </div>
+
+    <div class="panel-title">Alerts</div>
+    <div id="alerts-panel"><div style="padding:8px 12px;font-size:11px;color:#8b949e;">No alerts</div></div>
+
+    <div class="panel-title">Radar Tracks</div>
+    <div id="track-list"></div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+</div>
+
+<!-- Detail panel -->
+<div id="detail-panel">
+  <span id="detail-close" onclick="closeDetail()">✕</span>
+  <div class="dp-title" id="dp-title">Track details</div>
+  <table id="dp-table"></table>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ── Map init ─────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [60.0, 25.2],
+  zoom: 8,
+  zoomControl: true,
+  preferCanvas: true,
+});
+
+// Base layer: OpenStreetMap
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors',
+  maxZoom: 18,
+}).addTo(map);
+
+// OpenSeaMap nautical overlay (free)
+const seaMap = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+  attribution: '© OpenSeaMap contributors',
+  opacity: 0.8,
+}).addTo(map);
+
+// EMODnet Bathymetry WMS (free, EU open data)
+const bathymetry = L.tileLayer.wms('https://ows.emodnet-bathymetry.eu/wms', {
+  layers: 'emodnet:mean_atlas_land',
+  format: 'image/png',
+  transparent: true,
+  opacity: 0.35,
+  attribution: '© EMODnet Bathymetry',
+});
+
+// Layer control
+const baseLayers   = { 'OpenStreetMap': osm };
+const overlayLayers = {
+  'OpenSeaMap (nautical)': seaMap,
+  'EMODnet Bathymetry': bathymetry,
+};
+L.control.layers(baseLayers, overlayLayers, { position: 'topright' }).addTo(map);
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const tracks      = {};   // target_id → { event, marker, listItem }
+const aisMarkers  = {};   // mmsi → marker
+let   eventCount  = 0;
+let   selectedId  = null;
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+function trackIcon(trackType) {
+  const colors = { confirmed: '#58a6ff', dark: '#f85149', unknown: '#e3b341' };
+  const color  = colors[trackType] || '#8b949e';
+  const glow   = trackType === 'dark' ? `filter:drop-shadow(0 0 6px ${color});` : '';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+    <polygon points="11,2 15,18 11,14 7,18" fill="${color}" stroke="#0d1117" stroke-width="1.5" style="${glow}"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+function aisIcon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+    <circle cx="7" cy="7" r="5" fill="none" stroke="#3fb950" stroke-width="1.5"/>
+    <circle cx="7" cy="7" r="2" fill="#3fb950"/>
+  </svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [14, 14], iconAnchor: [7, 7] });
+}
+
+// ── Rotate helper (CSS transform on marker) ────────────────────────────────
+function setMarkerRotation(marker, deg) {
+  const el = marker.getElement();
+  if (el) el.style.transform = (el.style.transform || '').replace(/rotate\([^)]+\)/, '')
+    + ` rotate(${deg}deg)`;
+}
+
+// ── Track marker management ───────────────────────────────────────────────────
+function upsertTrack(ev) {
+  const t  = ev.target;
+  const id = t.target_id;
+
+  if (!tracks[id]) {
+    const marker   = L.marker([t.lat, t.lon], { icon: trackIcon(t.track_type) }).addTo(map);
+    marker.on('click', () => showDetail(id));
+    const listItem = makeListItem(id, t);
+    tracks[id] = { ev, marker, listItem };
+    document.getElementById('track-list').prepend(listItem);
+  } else {
+    tracks[id].ev = ev;
+    tracks[id].marker.setLatLng([t.lat, t.lon]);
+    tracks[id].marker.setIcon(trackIcon(t.track_type));
+    updateListItem(tracks[id].listItem, t);
+  }
+  setMarkerRotation(tracks[id].marker, t.heading_deg);
+
+  if (selectedId === id) showDetail(id);
+}
+
+// ── List items ────────────────────────────────────────────────────────────────
+function makeListItem(id, t) {
+  const div = document.createElement('div');
+  div.className = 'track-item';
+  div.dataset.id = id;
+  div.innerHTML = listHTML(t);
+  div.onclick = () => { map.setView([t.lat, t.lon], 10); showDetail(id); };
+  return div;
+}
+
+function updateListItem(el, t) {
+  el.innerHTML = listHTML(t);
+}
+
+function listHTML(t) {
+  const name  = t.vessel_name || (t.track_type === 'dark' ? '⚠ DARK TARGET' : `Track ${t.target_id.slice(0,8)}`);
+  const mmsi  = t.mmsi ? `MMSI: ${t.mmsi}` : 'No AIS';
+  const speed = `${(t.speed_mps * 1.944).toFixed(1)} kn`;
+  return `<span class="dot ${t.track_type}"></span>
+    <div class="track-info">
+      <div class="track-name">${name}</div>
+      <div class="track-meta">${mmsi} &nbsp;·&nbsp; ${speed} &nbsp;·&nbsp; ${t.vessel_type}</div>
+    </div>`;
+}
+
+// ── Detail panel ──────────────────────────────────────────────────────────────
+function showDetail(id) {
+  selectedId = id;
+  document.querySelectorAll('.track-item').forEach(el =>
+    el.classList.toggle('selected', el.dataset.id === id));
+
+  const ev = tracks[id].ev;
+  const t  = ev.target;
+  const ss = ev.sea_state;
+  document.getElementById('dp-title').textContent =
+    t.vessel_name || (t.track_type === 'dark' ? '⚠ DARK TARGET' : `Track ${id.slice(0,8)}`);
+
+  const rows = [
+    ['Track type',  `<span style="color:${t.track_type==='dark'?'#f85149':t.track_type==='confirmed'?'#58a6ff':'#e3b341'}">${t.track_type.toUpperCase()}</span>`],
+    ['Vessel type', t.vessel_type],
+    ['MMSI',        t.mmsi ?? '<span style="color:#f85149">NONE</span>'],
+    ['Speed',       `${(t.speed_mps * 1.944).toFixed(1)} kn`],
+    ['Heading',     `${t.heading_deg}°`],
+    ['Confidence',  `${(t.confidence * 100).toFixed(0)}%`],
+    ['Lat / Lon',   `${t.lat.toFixed(4)}, ${t.lon.toFixed(4)}`],
+    ['Scenario',    ev.meta.scenario ?? '—'],
+    ['Event ID',    `<span style="font-size:9px;color:#8b949e">${ev.event_id.slice(0,18)}…</span>`],
+  ];
+  if (ss) {
+    rows.push(['Wind',  `${ss.wind_speed_mps?.toFixed(1) ?? '—'} m/s`]);
+    rows.push(['Waves', `${ss.wave_height_m?.toFixed(2) ?? '—'} m`]);
+  }
+
+  document.getElementById('dp-table').innerHTML =
+    rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+  document.getElementById('detail-panel').style.display = 'block';
+}
+
+function closeDetail() {
+  selectedId = null;
+  document.getElementById('detail-panel').style.display = 'none';
+  document.querySelectorAll('.track-item').forEach(el => el.classList.remove('selected'));
+}
+
+// ── Alert panel ───────────────────────────────────────────────────────────────
+function addAlert(alert) {
+  const panel = document.getElementById('alerts-panel');
+  const empty = panel.querySelector('[style]');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = 'alert-item';
+  div.innerHTML = `<div class="alert-title">⚠ DARK TARGET DETECTED</div>
+    <div class="alert-sub">${alert.message}</div>
+    <div class="alert-sub">${alert.lat?.toFixed(4)}, ${alert.lon?.toFixed(4)} &nbsp;·&nbsp; ${alert.alert_time?.slice(11,19)} UTC</div>`;
+  panel.prepend(div);
+
+  document.getElementById('badge-dark').style.display = 'inline';
+}
+
+// ── Weather ───────────────────────────────────────────────────────────────────
+async function refreshWeather() {
+  try {
+    const r = await fetch('/api/weather');
+    const w = await r.json();
+    document.getElementById('wx-wind').textContent =
+      w.wind_speed_mps != null ? `${w.wind_speed_mps.toFixed(1)} m/s` : '—';
+    document.getElementById('wx-dir').textContent  =
+      w.wind_dir_deg  != null ? `${w.wind_dir_deg.toFixed(0)}°` : '—';
+    document.getElementById('wx-wave').textContent =
+      w.wave_height_m != null ? `${w.wave_height_m.toFixed(2)} m` : '—';
+  } catch { /* ignore */ }
+}
+
+// ── AIS overlay ───────────────────────────────────────────────────────────────
+async function refreshAIS() {
+  try {
+    const r   = await fetch('/api/ais');
+    const arr = await r.json();
+    document.getElementById('ais-count').textContent = arr.length;
+
+    const seen = new Set();
+    for (const v of arr) {
+      seen.add(v.mmsi);
+      if (!aisMarkers[v.mmsi]) {
+        aisMarkers[v.mmsi] = L.marker([v.lat, v.lon], {
+          icon: aisIcon(), opacity: 0.7, zIndexOffset: -100,
+        }).addTo(map).bindTooltip(`AIS ${v.mmsi}`, { permanent: false });
+      } else {
+        aisMarkers[v.mmsi].setLatLng([v.lat, v.lon]);
+      }
+    }
+    for (const mmsi in aisMarkers) {
+      if (!seen.has(Number(mmsi))) {
+        map.removeLayer(aisMarkers[mmsi]);
+        delete aisMarkers[mmsi];
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+// ── Status polling ────────────────────────────────────────────────────────────
+let knownAlerts = new Set();
+async function pollStatus() {
+  try {
+    const r   = await fetch('/api/status');
+    const st  = await r.json();
+    for (const a of (st.dark_alerts || [])) {
+      if (!knownAlerts.has(a.target_id)) {
+        knownAlerts.add(a.target_id);
+        addAlert(a);
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+// ── SSE radar stream ─────────────────────────────────────────────────────────
+const sse = new EventSource('/stream');
+sse.onmessage = (e) => {
+  const ev = JSON.parse(e.data);
+  eventCount++;
+  document.getElementById('ev-count').textContent = eventCount;
+  document.getElementById('tr-count').textContent = Object.keys(tracks).length;
+  upsertTrack(ev);
+};
+sse.onerror = () => {
+  document.getElementById('badge-radar').textContent = 'RADAR ✕';
+  document.getElementById('badge-radar').style.borderColor = '#f85149';
+  document.getElementById('badge-radar').style.color = '#f85149';
+};
+
+// ── Periodic refreshes ────────────────────────────────────────────────────────
+refreshWeather();
+refreshAIS();
+pollStatus();
+setInterval(refreshWeather, 60_000);
+setInterval(refreshAIS,     15_000);
+setInterval(pollStatus,      5_000);
+</script>
+</body>
+</html>
