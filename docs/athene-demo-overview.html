@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Athene Platform — Demo Overview</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --blue: #58a6ff;
+    --green: #3fb950; --orange: #f0a500; --red: #f85149;
+    --yellow: #e3b341; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    padding: 0 0 60px;
+  }
+  @media print {
+    body { background: #fff; color: #111; }
+    .no-print { display: none; }
+    .card { border: 1px solid #ccc; box-shadow: none; }
+    a { color: #1a73e8; }
+    :root {
+      --bg:#fff; --surface:#f6f8fa; --border:#d0d7de;
+      --text:#111; --muted:#555; --blue:#0969da; --green:#1a7f37;
+      --orange:#9a6700; --red:#cf222e; --yellow:#9a6700; --purple:#6e40c9;
+    }
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 60%, #1a2233 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 48px 64px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::after {
+    content: "";
+    position: absolute; top: 0; right: 0; bottom: 0; width: 40%;
+    background: radial-gradient(ellipse at 80% 50%, rgba(88,166,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  header .badge-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .pill {
+    font-size: 11px; font-weight: 600; letter-spacing: .5px;
+    padding: 3px 10px; border-radius: 20px; border: 1px solid;
+    text-transform: uppercase;
+  }
+  .pill-blue   { border-color: var(--blue);   color: var(--blue);   }
+  .pill-green  { border-color: var(--green);  color: var(--green);  }
+  .pill-orange { border-color: var(--orange); color: var(--orange); }
+  header h1 {
+    font-size: 36px; font-weight: 700; letter-spacing: -0.5px;
+    color: var(--blue); margin-bottom: 6px;
+  }
+  header h1 span { color: var(--text); }
+  header .subtitle { font-size: 16px; color: var(--muted); max-width: 620px; }
+  header .meta { margin-top: 20px; font-size: 12px; color: var(--muted); }
+
+  /* ── Layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
+  section { margin-top: 48px; }
+  h2 {
+    font-size: 20px; font-weight: 700; color: var(--blue);
+    border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  h2 .bucket-num {
+    background: var(--blue); color: #0d1117;
+    font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 12px;
+  }
+  h3 { font-size: 14px; font-weight: 600; color: var(--text); margin: 20px 0 8px; }
+
+  /* ── Cards ── */
+  .card-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px;
+  }
+  .card h4 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .card p  { font-size: 12px; color: var(--muted); }
+  .card .tag { font-size: 10px; font-weight: 600; color: var(--orange); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border); padding: 8px 12px;
+    background: var(--surface);
+  }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(88,166,255,0.04); }
+  .tbl-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 12px; }
+  td code { font-family: "SFMono-Regular", Consolas, monospace; font-size: 11px; color: var(--green); background: rgba(63,185,80,0.1); padding: 1px 5px; border-radius: 3px; }
+  td strong { color: var(--blue); }
+
+  /* ── Roles ── */
+  .role-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .role-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px 20px;
+    border-left: 3px solid var(--blue);
+  }
+  .role-card.orange { border-left-color: var(--orange); }
+  .role-card.green  { border-left-color: var(--green); }
+  .role-card.purple { border-left-color: var(--purple); }
+  .role-card.red    { border-left-color: var(--red); }
+  .role-card.yellow { border-left-color: var(--yellow); }
+  .role-card .fi  { font-size: 16px; font-weight: 700; color: var(--text); }
+  .role-card .en  { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .role-card .desc { font-size: 12px; color: var(--muted); }
+
+  /* ── Architecture ── */
+  .arch {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 24px 28px; font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 12px; color: var(--green); overflow-x: auto; line-height: 1.8;
+  }
+
+  /* ── AI scenarios ── */
+  .scenario-list { display: flex; flex-direction: column; gap: 12px; }
+  .scenario {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--orange); border-radius: 8px; padding: 14px 18px;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .scenario .num {
+    font-size: 18px; font-weight: 700; color: var(--orange); min-width: 28px;
+  }
+  .scenario h4 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .scenario p  { font-size: 12px; color: var(--muted); }
+
+  /* ── Status table ── */
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot-done    { background: var(--green); }
+  .dot-pending { background: var(--yellow); }
+  .dot-future  { background: var(--muted); }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 64px; border-top: 1px solid var(--border);
+    padding: 24px 64px; font-size: 11px; color: var(--muted);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  /* ── Print button ── */
+  .print-btn {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--blue); color: #0d1117;
+    border: none; border-radius: 8px; padding: 10px 18px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(88,166,255,0.3);
+    z-index: 999;
+  }
+  .print-btn:hover { background: #79c0ff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge-row">
+    <span class="pill pill-blue">Maritime Situational Awareness</span>
+    <span class="pill pill-orange">AERIS-10 · PLFM Radar</span>
+    <span class="pill pill-green">ESRI + Microsoft Azure</span>
+  </div>
+  <h1>⚡ ATHENE <span>Platform</span></h1>
+  <div class="subtitle">Demo Overview — ESRI &amp; Microsoft Joint Planning · Gulf of Finland Corridor</div>
+  <div class="meta">Prepared April 2026 &nbsp;·&nbsp; Confidential — internal planning document</div>
+</header>
+
+<div class="container">
+
+<!-- ── Overview ── -->
+<section>
+  <h2>Overview</h2>
+  <p style="color:var(--muted);font-size:14px;max-width:800px">
+    The Athene demo showcases a <strong style="color:var(--text)">Maritime Situational Awareness (MSA) platform</strong>
+    built on the <strong style="color:var(--orange)">AERIS-10</strong> open-source phased-array radar (10.5 GHz, up to 20 km range),
+    fused with live and simulated data sources and presented through an
+    <strong style="color:var(--text)">ESRI ArcGIS + Microsoft Azure</strong> cloud stack.
+    The demo area is the <strong style="color:var(--blue)">Gulf of Finland / Tallinn–Uurainen corridor</strong>
+    — a strategically relevant, data-rich maritime environment.
+  </p>
+
+  <div class="arch" style="margin-top:24px">
+[AERIS-10 Sensor / Athene Simulator]
+        │  event_id (UUID v4) — flows through every hop
+        ▼
+[Azure Event Hub] ──────────────────────────────────────────┐
+        │                                                    │
+        ▼                                                    ▼
+[Azure Eventhouse / KQL]                        [ArcGIS Online / ESRI Velocity]
+        │  streaming anomaly detection                       │  animated track layer
+        ▼                                                    ▼
+[Microsoft Fabric / OneLake]              [Experience Builder role dashboards]
+        │  Delta tables per domain                           │
+        ▼                                                    │
+[Azure AI Foundry / Agent Framework] ◄──────────────────────┘
+        │  Agents · Foundry IQ · Copilot
+        ▼
+[Role-Based Playgrounds: Valvoja · Johtaja · Tutkija · Kehittäjä · Ylläpitäjä · Partner]
+  </div>
+</section>
+
+<!-- ── Bucket 1 ── -->
+<section>
+  <h2><span class="bucket-num">1</span> Core Demo</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:20px">
+    Radar visualisation on ESRI GIS, interlinked via Unique ID with ArcGIS Online, live vessel &amp; open data.
+    Currently running <strong style="color:var(--green)">locally on laptop</strong> with live Finnish open data.
+  </p>
+
+  <h3>Radar Visualisation</h3>
+  <div class="card-grid">
+    <div class="card">
+      <div class="tag">AERIS-10 · Local demo</div>
+      <h4>PLFM Radar Track Overlay</h4>
+      <p>4 synthetic radar sites (Tallinn, Helsinki, Tampere, Uurainen). Authentic range/Doppler bins, rotating beam, CFAR detection. Events carry <code>event_id</code> UUID.</p>
+    </div>
+    <div class="card">
+      <div class="tag">ESRI · Cloud phase</div>
+      <h4>ArcGIS Feature Layer</h4>
+      <p>Near-real-time track feed via ESRI Velocity. Animated symbols with age-fade, time-slider replay, correlated AIS vessel cards.</p>
+    </div>
+    <div class="card">
+      <div class="tag">Architecture</div>
+      <h4>Unique ID Chain</h4>
+      <p>Every radar detection → <code>event_id</code> UUID propagates through Event Hub → Eventhouse → ArcGIS feature → OneLake Delta row. Full provenance at every hop.</p>
+    </div>
+  </div>
+
+  <h3>Live AIS Data Sources</h3>
+  <div class="tbl-wrap">
+    <table>
+      <tr><th>Source</th><th>Country</th><th>Content</th><th>Access</th></tr>
+      <tr><td><strong>Digitraffic / Traficom</strong></td><td>🇫🇮 Finland</td><td>Real-time AIS, ~800 vessels Gulf of Finland</td><td>Open REST/WebSocket</td></tr>
+      <tr><td><strong>Sjöfartsverket</strong></td><td>🇸🇪 Sweden</td><td>AIS Swedish waters</td><td>Open API</td></tr>
+      <tr><td><strong>Veeteede Amet</strong></td><td>🇪🇪 Estonia</td><td>AIS + navigational notices</td><td>Open</td></tr>
+      <tr><td><strong>Kystverket</strong></td><td>🇳🇴 Norway</td><td>AIS + harbour data</td><td>Open</td></tr>
+      <tr><td><strong>EMSA SafeSeaNet</strong></td><td>🇪🇺 EU</td><td>EU-wide AIS aggregation</td><td>Licensed / freemium</td></tr>
+    </table>
+  </div>
+
+  <h3>Open Data Layers — Finland &amp; Neighbours</h3>
+  <div class="tbl-wrap">
+    <table>
+      <tr><th>Dataset</th><th>Provider</th><th>Layer type</th></tr>
+      <tr><td>Weather &amp; wave observations</td><td>FMI open data API 🇫🇮</td><td>Sensor context, radar propagation</td></tr>
+      <tr><td>Maritime charts (ENC), fairways, depth</td><td>Traficom 🇫🇮</td><td>Chart basemap</td></tr>
+      <tr><td>Shoreline &amp; topography</td><td>Maanmittauslaitos 🇫🇮</td><td>Basemap</td></tr>
+      <tr><td>Baltic bathymetry</td><td>EMODnet 🇪🇺</td><td>Seabed depth</td></tr>
+      <tr><td>Sea state, currents, SST</td><td>Copernicus CMEMS 🇪🇺</td><td>Ocean environment</td></tr>
+      <tr><td>SAR satellite imagery</td><td>Copernicus Sentinel-1 🇪🇺</td><td>Dark vessel detection, oil spills</td></tr>
+      <tr><td>Ocean &amp; weather (SE)</td><td>SMHI 🇸🇪</td><td>Sea state, currents</td></tr>
+      <tr><td>Geodata / charts (SE)</td><td>Lantmäteriet 🇸🇪</td><td>High-res seabed</td></tr>
+      <tr><td>Maritime environmental data (EE)</td><td>Estonian Environment Agency 🇪🇪</td><td>Water quality, anomalies</td></tr>
+      <tr><td>HELCOM shipping lanes &amp; pollution</td><td>HELCOM 🇪🇺</td><td>Environmental overlay</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ── Bucket 2 ── -->
+<section>
+  <h2><span class="bucket-num">2</span> Azure Platform Foundation</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Microsoft Fabric · OneLake · Eventhouse · AI Foundry as data backbone.</p>
+  <div class="card-grid">
+    <div class="card">
+      <div class="tag">Core storage</div>
+      <h4>Microsoft Fabric + OneLake</h4>
+      <p>Unified analytics workspace. Single Delta/Parquet lake shared across Fabric workloads and exportable to ArcGIS. Lakehouses per domain: radar, AIS, weather, environment.</p>
+    </div>
+    <div class="card">
+      <div class="tag">Streaming</div>
+      <h4>Azure Eventhouse (KQL)</h4>
+      <p>Streaming ingestion from Athene simulator &amp; ESRI Velocity. KQL queries for track analytics and time-series anomaly detection. Fabric Real-Time Intelligence.</p>
+    </div>
+    <div class="card">
+      <div class="tag">Message bus</div>
+      <h4>Azure Event Hub</h4>
+      <p>Bridges Athene simulator → Eventhouse → downstream consumers. Partitioned by radar site for parallel ingestion.</p>
+    </div>
+    <div class="card">
+      <div class="tag">AI hub</div>
+      <h4>Azure AI Foundry</h4>
+      <p>Central model deployment, prompt flows, and agent orchestration. Connects to Fabric data. Hosts custom ML models for vessel classification and anomaly detection.</p>
+    </div>
+    <div class="card">
+      <div class="tag">Batch ingestion</div>
+      <h4>Fabric Pipelines</h4>
+      <p>Batch ingestion of open data (AIS snapshots, FMI, EMODnet) into OneLake. Scheduled refreshes keep reference data current.</p>
+    </div>
+    <div class="card">
+      <div class="tag">Identity &amp; access</div>
+      <h4>Microsoft Entra ID</h4>
+      <p>Role groups map to OneLake row-level security + ArcGIS item sharing. Single sign-on across Fabric, ArcGIS, and Copilot Studio agents.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Bucket 3 ── -->
+<section>
+  <h2><span class="bucket-num">3</span> AI &amp; Agent Layer</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Foundry IQ · Microsoft Agent Framework · Azure AI Search · Agent 365 · Copilot.</p>
+
+  <div class="tbl-wrap" style="margin-bottom:24px">
+    <table>
+      <tr><th>Capability</th><th>Technology</th><th>Demo story</th></tr>
+      <tr><td><strong>Natural language situational queries</strong></td><td>Azure AI Foundry + AI Search</td><td><em>"Show all unidentified tracks within 5 km of shipping lane in last 30 min"</em></td></tr>
+      <tr><td><strong>Agentic anomaly alerting</strong></td><td>Foundry + Agent Framework</td><td>Autonomous agent monitors Eventhouse stream; alerts when radar track has no AIS &gt;10 min</td></tr>
+      <tr><td><strong>Multi-agent orchestration</strong></td><td>Microsoft Agent Framework (AutoGen)</td><td>Track enrichment → weather context → reporting agent pipeline</td></tr>
+      <tr><td><strong>Copilot in ArcGIS / Power BI</strong></td><td>M365 Copilot + ESRI integration</td><td><em>"Summarise vessel activity patterns last 7 days in sector 3"</em></td></tr>
+      <tr><td><strong>Semantic document search</strong></td><td>Azure AI Search</td><td>Researcher queries unstructured incident history and open data documentation</td></tr>
+      <tr><td><strong>Commander briefing</strong></td><td>Foundry IQ</td><td>Multi-source intelligence synthesis for Johtaja-level briefing</td></tr>
+      <tr><td><strong>Role-specific assistants</strong></td><td>Copilot Studio custom agents</td><td>"Valvoja Copilot" for watch officer, scoped tools and data access per role</td></tr>
+    </table>
+  </div>
+
+  <h3>Key AI Demo Scenarios</h3>
+  <div class="scenario-list">
+    <div class="scenario">
+      <div class="num">1</div>
+      <div>
+        <h4>Dark Target Detection</h4>
+        <p>Radar track exists, no AIS correlation → agent raises alert, queries Copernicus Sentinel-1 SAR imagery, generates incident report automatically.</p>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="num">2</div>
+      <div>
+        <h4>Vessel Behaviour Anomaly</h4>
+        <p>Speed/heading deviation from historical AIS pattern → Foundry IQ flags and explains its reasoning chain to the analyst.</p>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="num">3</div>
+      <div>
+        <h4>Natural Language Tactical Briefing</h4>
+        <p>Johtaja asks Copilot <em>"What is the current threat picture in sector Alpha?"</em> → synthesised answer from radar + AIS + weather in seconds.</p>
+      </div>
+    </div>
+    <div class="scenario">
+      <div class="num">4</div>
+      <div>
+        <h4>Developer Playground</h4>
+        <p>Kehittäjä calls Foundry REST APIs to test custom prompt flows against live Eventhouse data and radar streams with GitHub Copilot assistance.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Bucket 4 ── -->
+<section>
+  <h2><span class="bucket-num">4</span> Extended &amp; Optional Elements</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="tag">Later phases</div>
+      <h4>3rd Party SaaS Integration</h4>
+      <p>Maritime domain awareness SaaS (Windward, Pole Star, Spire Maritime) for vessel intelligence enrichment. ESRI ArcGIS Insights as premium analytics layer. National C2/MARIS-type API gateway.</p>
+    </div>
+    <div class="card">
+      <div class="tag">ML models</div>
+      <h4>Custom Machine Learning</h4>
+      <p>Track-to-track association · Vessel classification from radar signature · Behaviour anomaly detection · Sea clutter suppression (CFAR). Hosted in Foundry model registry.</p>
+    </div>
+    <div class="card">
+      <div class="tag">Pilot</div>
+      <h4>Sensor Fusion</h4>
+      <p>AERIS-10 radar + AIS transponder + Sentinel-1 SAR fused via Eventhouse KQL or Kalman filter deployed as Azure Container App. Output: fused track with confidence ellipse.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Bucket 5 ── -->
+<section>
+  <h2><span class="bucket-num">5</span> Role-Based Playgrounds</h2>
+  <p style="color:var(--muted);font-size:13px;margin-bottom:20px">
+    Separate demo environments per user persona. Entra ID groups → OneLake row-level security + ArcGIS item sharing.
+  </p>
+  <div class="role-grid">
+    <div class="role-card">
+      <div class="fi">Valvoja</div>
+      <div class="en">Watch Officer / Supervisor</div>
+      <div class="desc">Real-time radar + AIS map, live alert feed, "Valvoja Copilot" for quick situational queries. Always-on, immediate response focus.</div>
+    </div>
+    <div class="role-card orange">
+      <div class="fi">Johtaja</div>
+      <div class="en">Commander / Manager</div>
+      <div class="desc">Tactical overview dashboard, Foundry IQ briefing generator, trend KPIs, executive summary exports. Strategic decision support.</div>
+    </div>
+    <div class="role-card green">
+      <div class="fi">Tutkija</div>
+      <div class="en">Analyst / Researcher</div>
+      <div class="desc">Full data access in Fabric, Jupyter notebooks, Azure AI Search over raw radar + incident data, ML experiment tracking in Foundry.</div>
+    </div>
+    <div class="role-card purple">
+      <div class="fi">Kehittäjä</div>
+      <div class="en">Developer</div>
+      <div class="desc">API sandbox, Foundry prompt flow editor, Eventhouse KQL playground, GitHub Copilot-assisted coding. Sandboxed Fabric workspace with sample data.</div>
+    </div>
+    <div class="role-card red">
+      <div class="fi">Ylläpitäjä</div>
+      <div class="en">System Administrator</div>
+      <div class="desc">Fabric capacity monitoring, data pipeline health dashboards, role and access management via Entra ID, audit logs.</div>
+    </div>
+    <div class="role-card yellow">
+      <div class="fi">Ulkopuolinen partner</div>
+      <div class="en">External Partner</div>
+      <div class="desc">Read-only ArcGIS Experience Builder view, limited to non-sensitive tracks + open data layers. Isolated data share via OneLake shortcut. No cloud login required.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Build status ── -->
+<section>
+  <h2>Build Status</h2>
+  <div class="tbl-wrap">
+    <table>
+      <tr><th>Phase</th><th>Status</th><th>Notes</th></tr>
+      <tr>
+        <td><strong>Local demo — radar simulator</strong></td>
+        <td><span class="status-dot dot-done"></span>Done</td>
+        <td>FastAPI + Leaflet.js, SSE stream, 4 PLFM sites, 14 vessel archetypes</td>
+      </tr>
+      <tr>
+        <td><strong>Live AIS (Digitraffic)</strong></td>
+        <td><span class="status-dot dot-done"></span>Done</td>
+        <td>~800 vessels Gulf of Finland, 30s cache, gzip fix applied</td>
+      </tr>
+      <tr>
+        <td><strong>FMI weather integration</strong></td>
+        <td><span class="status-dot dot-done"></span>Done</td>
+        <td>Wind speed, direction, wave height proxy, 5 min cache</td>
+      </tr>
+      <tr>
+        <td><strong>PLFM radar simulation</strong></td>
+        <td><span class="status-dot dot-done"></span>Done</td>
+        <td>AERIS-10 style: range/Doppler bins, beam rotation, geo-projection, I/Q values</td>
+      </tr>
+      <tr>
+        <td><strong>Map UI — EMODnet bathymetry, OpenSeaMap</strong></td>
+        <td><span class="status-dot dot-done"></span>Done</td>
+        <td>Leaflet.js dark theme, nautical overlay, animated markers</td>
+      </tr>
+      <tr>
+        <td><strong>Azure Event Hub + Eventhouse</strong></td>
+        <td><span class="status-dot dot-pending"></span>Pending</td>
+        <td>Awaiting Azure provisioning</td>
+      </tr>
+      <tr>
+        <td><strong>ESRI ArcGIS Online integration</strong></td>
+        <td><span class="status-dot dot-pending"></span>Pending</td>
+        <td>Awaiting ArcGIS Online org + ESRI Velocity licence</td>
+      </tr>
+      <tr>
+        <td><strong>AI Foundry agents</strong></td>
+        <td><span class="status-dot dot-future"></span>Planned</td>
+        <td>After Azure platform provisioned</td>
+      </tr>
+      <tr>
+        <td><strong>Role dashboards</strong></td>
+        <td><span class="status-dot dot-future"></span>Planned</td>
+        <td>Experience Builder + Power BI per role</td>
+      </tr>
+    </table>
+  </div>
+</section>
+
+<!-- ── Open items ── -->
+<section>
+  <h2>Open Items</h2>
+  <div class="tbl-wrap">
+    <table>
+      <tr><th>Item</th><th>Owner</th><th>Notes</th></tr>
+      <tr><td>ESRI Velocity licence + Event Hub connector</td><td>ESRI + Microsoft</td><td>Core pipeline dependency</td></tr>
+      <tr><td>ArcGIS Online org provisioned for demo</td><td>ESRI</td><td></td></tr>
+      <tr><td>Fabric capacity (F4+) provisioned</td><td>Microsoft</td><td>Required for Eventhouse + Real-Time Intelligence</td></tr>
+      <tr><td>Azure AI Foundry workspace</td><td>Microsoft</td><td>Foundry IQ access needed</td></tr>
+      <tr><td>Copernicus / EMODnet API access</td><td>Team</td><td>Free registration</td></tr>
+      <tr><td>Role persona sign-off</td><td>Customer</td><td>Finnish role names confirmed above</td></tr>
+      <tr><td>Customer sensor data format (if any)</td><td>Customer</td><td>Optional — simulator covers this for now</td></tr>
+    </table>
+  </div>
+</section>
+
+</div><!-- /container -->
+
+<footer>
+  <span>⚡ Athene Platform · Maritime Situational Awareness Demo</span>
+  <span>AERIS-10 · ESRI ArcGIS · Microsoft Azure · April 2026</span>
+</footer>
+
+<button class="print-btn no-print" onclick="window.print()">⬇ Save as PDF</button>
+
+</body>
+</html>
