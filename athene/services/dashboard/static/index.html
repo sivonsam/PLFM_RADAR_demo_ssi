@@ -185,6 +185,7 @@
   <span class="badge live" id="badge-ais">AIS ●</span>
   <span class="badge live" id="badge-radar">RADAR ●</span>
   <span class="badge dark-warn" id="badge-dark" style="display:none">⚠ DARK TARGET</span>
+  <button onclick="fitAllSites()" style="margin-left:8px;padding:3px 10px;background:#161b22;border:1px solid #30363d;color:#8b949e;border-radius:4px;cursor:pointer;font-size:11px;" title="Zoom to show all 4 radar sites">⬡ Fit sites</button>
   <div id="status-bar">
     Events: <strong id="ev-count">0</strong> &nbsp;|&nbsp;
     Tracks: <strong id="tr-count">0</strong> &nbsp;|&nbsp;
@@ -492,6 +493,15 @@ async function pollStatus() {
   } catch { /* ignore */ }
 }
 
+// ── Fit all radar sites into view ─────────────────────────────────────────────
+function fitAllSites() {
+  // Bounds encompass all 4 sites with padding
+  map.fitBounds([
+    [59.2, 24.3],   // SW — south of Tallinn
+    [62.9, 25.6],   // NE — north of Uurainen
+  ], { padding: [30, 30] });
+}
+
 // ── Radar site markers ────────────────────────────────────────────────────────
 async function loadRadarSites() {
   try {
@@ -542,6 +552,7 @@ refreshWeather();
 refreshAIS();
 pollStatus();
 loadRadarSites();
+fitAllSites();
 setInterval(refreshWeather, 60_000);
 setInterval(refreshAIS,     15_000);
 setInterval(pollStatus,      5_000);
