@@ -8,19 +8,21 @@ GET /stream         Server-Sent Events: radar track events from Athene simulator
 GET /api/ais        Latest AIS vessels from Digitraffic (Gulf of Finland bbox)
 GET /api/weather    Latest FMI weather snapshot for Helsinki
 GET /api/status     Session info, track counts, dark-target alert list
+GET /api/radar_sites  PLFM radar site positions (for map icons)
 
 Run
 ---
   cd athene/services/dashboard
-  uvicorn app:app --reload --port 8765
+  python3 -m uvicorn app:app --reload --port 8765
 
 Then open http://localhost:8765 in your browser.
 
 Flags (environment variables)
 ------------------------------
-  ATHENE_RATE     Simulator events per second  (default 1.0)
-  ATHENE_DT       Simulated time-step seconds  (default 5.0)
-  ATHENE_LIVE_AIS 1 = correlate with live Digitraffic AIS (default 1)
+  ATHENE_RATE       Simulator events per second  (default 1.0)
+  ATHENE_DT         Simulated time-step seconds  (default 5.0)
+  ATHENE_LIVE_AIS   1 = correlate with live Digitraffic AIS (default 1)
+  ATHENE_PLFM_RATE  PLFM radar events per second (default 2.0)
 """
 from __future__ import annotations
 
@@ -36,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "simulator"))
 
 from ais_feed import fetch_ais
 from archetypes import initial_pool, respawn
+from plfm_source import RADAR_SITES, plfm_event_stream
 from schema import Meta, RadarEvent, SeaState, TargetFields
 from weather import WeatherSnapshot, fetch_weather
 
@@ -45,9 +48,10 @@ from fastapi.staticfiles import StaticFiles
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-RATE     = float(os.environ.get("ATHENE_RATE",     "1.0"))
-DT       = float(os.environ.get("ATHENE_DT",       "5.0"))
-LIVE_AIS = os.environ.get("ATHENE_LIVE_AIS", "1") == "1"
+RATE      = float(os.environ.get("ATHENE_RATE",      "1.0"))
+DT        = float(os.environ.get("ATHENE_DT",        "5.0"))
+LIVE_AIS  = os.environ.get("ATHENE_LIVE_AIS",  "1") == "1"
+PLFM_RATE = float(os.environ.get("ATHENE_PLFM_RATE", "2.0"))
 
 DARK_ALERT_SECS = 120   # flag dark target after this many seconds with no AIS
 
@@ -60,9 +64,11 @@ app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), na
 
 _session_id   = RadarEvent.make_id()
 _pool         = initial_pool()
+_plfm_stream  = plfm_event_stream(_session_id)   # PLFM radar generator
 _event_count  = 0
-_dark_first_seen: dict[str, float] = {}   # target_id → monotonic time first seen
-_dark_alerts:    list[dict]        = []   # raised alerts for the UI
+_plfm_count   = 0
+_dark_first_seen: dict[str, float] = {}
+_dark_alerts:    list[dict]        = []
 
 
 def _sea_state(snap: WeatherSnapshot) -> SeaState | None:
@@ -128,13 +134,29 @@ def _check_dark_alert(event: RadarEvent) -> None:
 # ── SSE stream ────────────────────────────────────────────────────────────────
 
 async def _event_generator():
-    global _event_count
-    interval = 1.0 / max(RATE, 0.001)
-    while True:
-        weather  = fetch_weather()
-        ais      = fetch_ais() if LIVE_AIS else {}
-        sea      = _sea_state(weather)
+    global _event_count, _plfm_count
+    sim_interval  = 1.0 / max(RATE,      0.001)
+    plfm_interval = 1.0 / max(PLFM_RATE, 0.001)
+    next_plfm     = time.monotonic()
 
+    while True:
+        weather = fetch_weather()
+        ais     = fetch_ais() if LIVE_AIS else {}
+        sea     = _sea_state(weather)
+
+        # ── Emit PLFM radar detections (interleaved) ──
+        now = time.monotonic()
+        while now >= next_plfm:
+            plfm_ev = next(_plfm_stream)
+            # Pass sea state through to PLFM events
+            plfm_ev.sea_state = sea
+            _plfm_count += 1
+            _event_count += 1
+            yield f"data: {json.dumps(plfm_ev.to_dict())}\n\n"
+            next_plfm += plfm_interval
+            now = time.monotonic()
+
+        # ── Emit vessel simulator tracks ──
         for idx, track in enumerate(_pool):
             track.step(DT)
             if track.out_of_bounds():
@@ -145,9 +167,8 @@ async def _event_generator():
             _check_dark_alert(event)
             _event_count += 1
 
-            payload = json.dumps(event.to_dict())
-            yield f"data: {payload}\n\n"
-            await asyncio.sleep(interval)
+            yield f"data: {json.dumps(event.to_dict())}\n\n"
+            await asyncio.sleep(sim_interval)
 
 
 @app.get("/stream")
@@ -202,12 +223,22 @@ def api_status():
     return JSONResponse({
         "session_id":    _session_id,
         "event_count":   _event_count,
+        "plfm_count":    _plfm_count,
         "track_count":   len(_pool),
         "dark_active":   len(dark_active),
         "dark_alerts":   _dark_alerts[-10:],
         "live_ais":      LIVE_AIS,
         "rate_hz":       RATE,
+        "plfm_rate_hz":  PLFM_RATE,
     })
+
+
+@app.get("/api/radar_sites")
+def api_radar_sites():
+    return JSONResponse([
+        {"site_id": s[2], "lat": s[0], "lon": s[1], "description": s[3]}
+        for s in RADAR_SITES
+    ])
 
 
 # ── Static / index ────────────────────────────────────────────────────────────

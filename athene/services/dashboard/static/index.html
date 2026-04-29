@@ -41,6 +41,18 @@
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
     #status-bar { margin-left: auto; font-size: 11px; color: #8b949e; }
 
+    /* Radar site pulse rings */
+    .radar-ring {
+      border-radius: 50%;
+      border: 2px solid #f0a500;
+      animation: radarPulse 2s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes radarPulse {
+      0%   { width: 12px; height: 12px; opacity: 0.9; margin: -6px; }
+      100% { width: 40px; height: 40px; opacity: 0;   margin: -20px; }
+    }
+
     /* ── Layout ── */
     #main {
       flex: 1;
@@ -176,7 +188,8 @@
   <div id="status-bar">
     Events: <strong id="ev-count">0</strong> &nbsp;|&nbsp;
     Tracks: <strong id="tr-count">0</strong> &nbsp;|&nbsp;
-    AIS vessels: <strong id="ais-count">0</strong>
+    AIS vessels: <strong id="ais-count">0</strong> &nbsp;|&nbsp;
+    PLFM detections: <strong id="plfm-count" style="color:#f0a500">0</strong>
   </div>
 </div>
 
@@ -259,7 +272,15 @@ let   eventCount  = 0;
 let   selectedId  = null;
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
-function trackIcon(trackType) {
+function trackIcon(trackType, eventType) {
+  if (eventType === 'plfm_radar') {
+    // Orange diamond — AERIS-10 PLFM detection
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+      <polygon points="9,1 17,9 9,17 1,9" fill="#f0a500" stroke="#0d1117" stroke-width="1.5"
+        style="filter:drop-shadow(0 0 4px #f0a500)"/>
+    </svg>`;
+    return L.divIcon({ html: svg, className: '', iconSize: [18, 18], iconAnchor: [9, 9] });
+  }
   const colors = { confirmed: '#58a6ff', dark: '#f85149', unknown: '#e3b341' };
   const color  = colors[trackType] || '#8b949e';
   const glow   = trackType === 'dark' ? `filter:drop-shadow(0 0 6px ${color});` : '';
@@ -272,6 +293,17 @@ function trackIcon(trackType) {
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   });
+}
+
+function radarSiteIcon() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+    <circle cx="10" cy="10" r="4" fill="#f0a500" stroke="#0d1117" stroke-width="1.5"/>
+    <line x1="10" y1="2" x2="10" y2="0" stroke="#f0a500" stroke-width="1.5"/>
+    <line x1="10" y1="20" x2="10" y2="18" stroke="#f0a500" stroke-width="1.5"/>
+    <line x1="2" y1="10" x2="0" y2="10" stroke="#f0a500" stroke-width="1.5"/>
+    <line x1="20" y1="10" x2="18" y2="10" stroke="#f0a500" stroke-width="1.5"/>
+  </svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [20, 20], iconAnchor: [10, 10] });
 }
 
 function aisIcon() {
@@ -295,16 +327,16 @@ function upsertTrack(ev) {
   const id = t.target_id;
 
   if (!tracks[id]) {
-    const marker   = L.marker([t.lat, t.lon], { icon: trackIcon(t.track_type) }).addTo(map);
+    const marker   = L.marker([t.lat, t.lon], { icon: trackIcon(t.track_type, ev.event_type) }).addTo(map);
     marker.on('click', () => showDetail(id));
-    const listItem = makeListItem(id, t);
+    const listItem = makeListItem(id, t, ev.event_type);
     tracks[id] = { ev, marker, listItem };
     document.getElementById('track-list').prepend(listItem);
   } else {
     tracks[id].ev = ev;
     tracks[id].marker.setLatLng([t.lat, t.lon]);
-    tracks[id].marker.setIcon(trackIcon(t.track_type));
-    updateListItem(tracks[id].listItem, t);
+    tracks[id].marker.setIcon(trackIcon(t.track_type, ev.event_type));
+    updateListItem(tracks[id].listItem, t, ev.event_type);
   }
   setMarkerRotation(tracks[id].marker, t.heading_deg);
 
@@ -312,24 +344,30 @@ function upsertTrack(ev) {
 }
 
 // ── List items ────────────────────────────────────────────────────────────────
-function makeListItem(id, t) {
+function makeListItem(id, t, eventType) {
   const div = document.createElement('div');
   div.className = 'track-item';
   div.dataset.id = id;
-  div.innerHTML = listHTML(t);
+  div.innerHTML = listHTML(t, eventType);
   div.onclick = () => { map.setView([t.lat, t.lon], 10); showDetail(id); };
   return div;
 }
 
-function updateListItem(el, t) {
-  el.innerHTML = listHTML(t);
+function updateListItem(el, t, eventType) {
+  el.innerHTML = listHTML(t, eventType);
 }
 
-function listHTML(t) {
-  const name  = t.vessel_name || (t.track_type === 'dark' ? '⚠ DARK TARGET' : `Track ${t.target_id.slice(0,8)}`);
-  const mmsi  = t.mmsi ? `MMSI: ${t.mmsi}` : 'No AIS';
+function listHTML(t, eventType) {
+  const isPlfm = eventType === 'plfm_radar';
+  const dotColor = isPlfm ? '#f0a500' : undefined;
+  const dotStyle = dotColor ? `style="background:${dotColor}"` : '';
+  const dotClass = isPlfm ? '' : t.track_type;
+  const name  = isPlfm
+    ? `⬡ PLFM ${t.target_id.slice(-8)}`
+    : (t.vessel_name || (t.track_type === 'dark' ? '⚠ DARK TARGET' : `Track ${t.target_id.slice(0,8)}`));
+  const mmsi  = t.mmsi ? `MMSI: ${t.mmsi}` : (isPlfm ? `SNR-based` : 'No AIS');
   const speed = `${(t.speed_mps * 1.944).toFixed(1)} kn`;
-  return `<span class="dot ${t.track_type}"></span>
+  return `<span class="dot ${dotClass}" ${dotStyle}></span>
     <div class="track-info">
       <div class="track-name">${name}</div>
       <div class="track-meta">${mmsi} &nbsp;·&nbsp; ${speed} &nbsp;·&nbsp; ${t.vessel_type}</div>
@@ -349,7 +387,9 @@ function showDetail(id) {
     t.vessel_name || (t.track_type === 'dark' ? '⚠ DARK TARGET' : `Track ${id.slice(0,8)}`);
 
   const rows = [
-    ['Track type',  `<span style="color:${t.track_type==='dark'?'#f85149':t.track_type==='confirmed'?'#58a6ff':'#e3b341'}">${t.track_type.toUpperCase()}</span>`],
+    ['Event type',  ev.event_type === 'plfm_radar'
+      ? '<span style="color:#f0a500">⬡ AERIS-10 PLFM</span>'
+      : `<span style="color:${t.track_type==='dark'?'#f85149':t.track_type==='confirmed'?'#58a6ff':'#e3b341'}">${t.track_type.toUpperCase()}</span>`],
     ['Vessel type', t.vessel_type],
     ['MMSI',        t.mmsi ?? '<span style="color:#f85149">NONE</span>'],
     ['Speed',       `${(t.speed_mps * 1.944).toFixed(1)} kn`],
@@ -357,8 +397,12 @@ function showDetail(id) {
     ['Confidence',  `${(t.confidence * 100).toFixed(0)}%`],
     ['Lat / Lon',   `${t.lat.toFixed(4)}, ${t.lon.toFixed(4)}`],
     ['Scenario',    ev.meta.scenario ?? '—'],
-    ['Event ID',    `<span style="font-size:9px;color:#8b949e">${ev.event_id.slice(0,18)}…</span>`],
   ];
+  if (ev.event_type === 'plfm_radar' && ev.meta.source_detail) {
+    const parts = ev.meta.source_detail.split(' ');
+    rows.push(['PLFM source', `<span style="font-size:9px;color:#f0a500">${parts.slice(0,3).join(' ')}</span>`]);
+  }
+  rows.push(['Event ID', `<span style="font-size:9px;color:#8b949e">${ev.event_id.slice(0,18)}…</span>`]);
   if (ss) {
     rows.push(['Wind',  `${ss.wind_speed_mps?.toFixed(1) ?? '—'} m/s`]);
     rows.push(['Waves', `${ss.wave_height_m?.toFixed(2) ?? '—'} m`]);
@@ -438,11 +482,42 @@ async function pollStatus() {
   try {
     const r   = await fetch('/api/status');
     const st  = await r.json();
+    document.getElementById('plfm-count').textContent = st.plfm_count ?? 0;
     for (const a of (st.dark_alerts || [])) {
       if (!knownAlerts.has(a.target_id)) {
         knownAlerts.add(a.target_id);
         addAlert(a);
       }
+    }
+  } catch { /* ignore */ }
+}
+
+// ── Radar site markers ────────────────────────────────────────────────────────
+async function loadRadarSites() {
+  try {
+    const r     = await fetch('/api/radar_sites');
+    const sites = await r.json();
+    for (const s of sites) {
+      // Pulse ring (decorative, CSS animation)
+      L.marker([s.lat, s.lon], {
+        icon: L.divIcon({
+          html: `<div class="radar-ring"></div>`,
+          className: '',
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        }),
+        zIndexOffset: -200,
+        interactive: false,
+      }).addTo(map);
+
+      // Site icon + label
+      L.marker([s.lat, s.lon], {
+        icon: radarSiteIcon(),
+        zIndexOffset: -100,
+      }).addTo(map).bindTooltip(
+        `<b>⬡ AERIS-10</b><br>${s.description}<br><span style="color:#8b949e;font-size:10px">${s.site_id}</span>`,
+        { permanent: false, direction: 'right' }
+      );
     }
   } catch { /* ignore */ }
 }
@@ -466,6 +541,7 @@ sse.onerror = () => {
 refreshWeather();
 refreshAIS();
 pollStatus();
+loadRadarSites();
 setInterval(refreshWeather, 60_000);
 setInterval(refreshAIS,     15_000);
 setInterval(pollStatus,      5_000);
