@@ -38,8 +38,8 @@ NUM_DOPPLER_BINS   = 32
 RANGE_RES_M        = MAX_RANGE_M / NUM_RANGE_BINS          # 312.5 m
 DOPPLER_RES_MPS    = 0.52                                   # m/s per bin
 MAX_SPEED_MPS      = (NUM_DOPPLER_BINS / 2) * DOPPLER_RES_MPS  # ±8.32 m/s
-BEAM_WIDTH_DEG     = 2.5           # 3 dB beamwidth (patch array)
-ROTATION_DEG_STEP  = 1.0           # stepper motor: 1° per step
+BEAM_WIDTH_DEG     = 10.0          # demo beam width — wider for visible detections
+ROTATION_DEG_STEP  = 5.0           # faster sweep for demo
 EARTH_R            = 6_371_000.0
 
 # ── Radar sites along Tallinn-Uurainen corridor ───────────────────────────────
@@ -97,8 +97,8 @@ class RadarSite:
     _scan_targets: list[dict] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
-        # Seed a small pool of persistent synthetic targets for this site
-        self._scan_targets = [self._random_target() for _ in range(random.randint(2, 5))]
+        # Seed a larger pool of targets for visible demo density
+        self._scan_targets = [self._random_target() for _ in range(random.randint(6, 10))]
 
     def _random_target(self) -> dict:
         """A persistent synthetic target in this radar's coverage."""
@@ -143,7 +143,7 @@ class RadarSite:
             # Beam-pattern gain roll-off (sinc-squared approximation)
             gain = math.cos(math.pi * ang_diff / BEAM_WIDTH_DEG) ** 2
             effective_snr = t["snr_db"] * gain
-            if effective_snr < 6.0:     # below CFAR threshold
+            if effective_snr < 3.0:     # lowered CFAR threshold for demo
                 continue
             i_val, q_val = _iq_from_snr(effective_snr)
             velocity_mps = (t["doppler_bin"] - NUM_DOPPLER_BINS / 2) * DOPPLER_RES_MPS
